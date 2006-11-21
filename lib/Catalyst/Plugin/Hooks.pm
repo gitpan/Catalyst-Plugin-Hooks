@@ -6,10 +6,7 @@ use warnings;
 use NEXT;
 use Carp;
 
-our $VERSION = '0.01';
-
-sub add_hook {
-}
+our $VERSION = '0.02';
 
 my %actions;
 @actions{ qw(
@@ -61,14 +58,16 @@ sub initialize_action {
     my ( $self, $action ) = @_;
 
     no strict 'refs';
+    ### Had to use eval for NEXT::$action
     eval q/ sub /. $action .q/ {
         my $c = shift;
+        my $action = '/. $action .q/';
 
-        for my $hook ( @{ $actions{'/. $action .q/'}->{before} } ) {
+        for my $hook ( @{ $actions{$action}->{before} } ) {
             $hook->( $c, @_ );
         }
         $c->NEXT::/. $action .q/(@_);
-        for my $hook ( @{ $actions{'/. $action .q/'}->{after} } ) {
+        for my $hook ( @{ $actions{$action}->{after} } ) {
             $hook->( $c, @_ );
         }
     } /;
@@ -104,8 +103,10 @@ In Some model:
     open my $filehandle, "> foo.log";
 
     $c->add_after_finalize_hook( sub {
+        my $c = shift;
         $filehandle->flush();
-    }
+        $c->log->info( "Flushed filehandle after finalize" );
+    } );
 
     return $self;
   }
@@ -113,12 +114,18 @@ In Some model:
 
 =head1 DESCRIPTION
 
-Implements hooks on Catalyst's engine actions. See L<Catalyst::Manual::Internals>
-for when the different actions are called. This is usefull for when you
-want some code run after all actions for a request are completed. Let's say
-you want to flush your log after the request is done. You can achieve this by
-calling
-C<$c->add_after_finalize_hook( sub { warn "Request done, time to cleanup"; $fh->flush } );
+This Plugin is usefull for when you want to run some code before or after a
+catalyst engine action. Consider writing a Catalyst plugin if you implement
+more general functionality. But let's say you want to flush your log's
+filehandle after the request is done (then the requestor doesn't have to wait
+for your log's to be flushed). It would be nice to put the code for flushing
+the filehandle next to the rest of the code that's bothered with the
+filehandle, so you don't have to pass the filehandle around. Example for this
+is shown in the L</SYNOPSIS>.
+
+Hooks are addable everywhere a $c exists, even in Controllers. But remember,
+adding a hook every request will cause a memory overflow. So don't put these
+methods in Controller actions.
 
 =head2 METHODS
 
@@ -146,17 +153,17 @@ All of these methods are currently hookable:
     finalize_body
 
 To add a I<before> hook, call
-  $c->add_ <method name> _hook( sub { some code } );>
+  $c->add_ <method name> _hook( sub { some code } );
 
 To add an I<after> hook, call
-  $c->add_after_ <method name> _hook( sub { some code } );>
+  $c->add_after_ <method name> _hook( sub { some code } );
 
 C<< $c->add_before_ <method name> _hook >> is an alias to C<< $c->add_ <method name> _hook >>.
 
 =head1 SEE ALSO
 
 L<Catalyst>,
-L<Catalyst::Manual::Internals>
+L<Catalyst::Manual::Internals> for when the different actions are called.
 
 =head1 AUTHOR
 
