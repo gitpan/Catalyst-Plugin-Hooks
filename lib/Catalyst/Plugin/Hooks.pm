@@ -6,7 +6,7 @@ use warnings;
 use NEXT;
 use Carp;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 my %actions;
 @actions{ qw(
@@ -52,6 +52,11 @@ for my $action ( keys %actions ) {
 
         push @{ $actions{$action}->{after} }, $hook;
     };
+
+    *{"remove_all_". $action ."_hooks"} = sub {
+        $actions{$action}->{before} = [];
+        $actions{$action}->{after}  = [];
+    };
 }
 
 sub initialize_action {
@@ -74,6 +79,16 @@ sub initialize_action {
     die $@ if $@;
     $actions{ $action }->{initialized} = 1;
 }
+
+sub remove_all_hooks {
+    my $self = shift;
+
+    for my $action ( values %actions ) {
+        $action->{before} = [];
+        $action->{after}  = [];
+    }
+}
+
 
 1
 
@@ -98,7 +113,7 @@ In Some model:
     my $self = shift;
     my ( $c ) = @_;
 
-    $self->NEXT::new( @_ );
+    $self = $self->NEXT::new( @_ );
 
     open my $filehandle, "> foo.log";
 
@@ -113,6 +128,13 @@ In Some model:
 
 
 =head1 DESCRIPTION
+
+Don't use this plugin!
+
+Use L<Catalyst::Plugin::Observe>. All functionality provided in C:P:Hooks will
+very shortly be available in C:P:Observe. C:P:Hooks is probably not going to
+work in the next Catalyst release, so rewrite your code to use C:P:Observe.
+
 
 This Plugin is usefull for when you want to run some code before or after a
 catalyst engine action. Consider writing a Catalyst plugin if you implement
@@ -152,13 +174,19 @@ All of these methods are currently hookable:
     finalize_cookies
     finalize_body
 
-To add a I<before> hook, call
+To add a I<before> hook:
   $c->add_ <method name> _hook( sub { some code } );
 
-To add an I<after> hook, call
+To add an I<after> hook:
   $c->add_after_ <method name> _hook( sub { some code } );
 
 C<< $c->add_before_ <method name> _hook >> is an alias to C<< $c->add_ <method name> _hook >>.
+
+To remove all hooks for an action:
+  $c->remove_all_ <method name> _hooks;
+
+To remove all hooks set by this module:
+  $c->remove_all_hooks;
 
 =head1 SEE ALSO
 
